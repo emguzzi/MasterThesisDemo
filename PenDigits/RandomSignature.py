@@ -5,6 +5,7 @@ import sklearn.metrics
 from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 import matplotlib.pyplot as plt
+from tqdm.auto import tqdm
 
 
 def sigmoid(x):
@@ -33,15 +34,15 @@ def get_random_coeff(d,hparams = hyperparams_dict):
     for i in range(d):
 
 
-        projection = np.random.normal(hparams['mean'], hparams['varA'],
+        projection = np.random.normal(hparams['mean'],np.sqrt(hparams['varA']),
             (hparams['res_size'], hparams['res_size']))
         
         norm = np.linalg.norm(projection, 2)
-        #why are wenormalizing to 0.99?
-        projection = projection / norm * 0.99
+        #why are we normalizing to 0.99?
+        projection = projection# / norm * 0.99
         random_projection.append(projection)
 
-        random_bias.append(np.random.normal(hparams['mean'], hparams['varA'], size=hparams['res_size']))
+        random_bias.append(np.random.normal(hparams['mean'], np.sqrt(hparams['varA']), size=hparams['res_size']))
 
     return np.array(random_projection), np.array(random_bias)
 
@@ -74,22 +75,43 @@ def compute_signature(As,bs,path,trajectory = False,hparams = hyperparams_dict):
             Sig += dSig
             
     return Sig
+
+def compute_signature_vect(As,bs,paths,hparams = hyperparams_dict):
+    dX = np.diff(paths, axis = 1)
+    Sig = np.ones((paths.shape[0],As.shape[1]))
+    for i in tqdm(range(dX.shape[1])):
+        #Einstein notation where b: batch_index, i: index of path coordinate, j: index of res_dim, k: row of the matrix A
+        temp = np.einsum('ijk,bk->bij',As,Sig,optimize = True)
+        temp = hparams['activation'](temp+bs)
+        Sig += np.einsum('bij,bi -> bj',temp,dX[:,i,:],optimize = True)
     
-def get_signature(paths,trajectory = False,**kwargs):
+    return Sig    
+def get_signature(paths,trajectory = False,vect = False,**kwargs):
 #Return the Signature for all the path in paths.
 #paths: batch of paths for which we want to compute the Signature.
 #trajectory: see above (function compute_signature)
 #output: depending on trajectory, ndarray of shape [len(paths),dim(r-Sig)], where
 # the dimension of r-Sig depends on the value of trajectory as described above.
-   
-    # paths dimension
-    paths_dim = paths[0].shape[1]
-    # generate vector fields
-    [As,bs] = get_random_coeff(d = paths_dim,**kwargs)
-
-    #Compute Signature for all observations
-    Sigs = np.array([compute_signature(As,bs,paths[i],trajectory,**kwargs) 
-                     for i in range(len(paths))])
+# if vect, paths should be an array containing *all* paths and the
+# signature is computed using np.einsum (faster)
+    
+    if vect:
+        #paths dimension
+        paths_dim = paths.shape[2]
+        # generate vector fields
+        [As,bs] = get_random_coeff(d = paths_dim,**kwargs)
+        # compute signature
+        Sigs = compute_signature_vect(As,bs,paths,**kwargs)
+    
+    else:
+        # paths dimension
+        paths_dim = paths[0].shape[1]
+        # generate vector fields
+        [As,bs] = get_random_coeff(d = paths_dim,**kwargs)
+    
+        #Compute Signature for all observations
+        Sigs = np.array([compute_signature(As,bs,paths[i],trajectory,**kwargs) 
+                        for i in tqdm(range(len(paths)))])
     return Sigs
 
 def evaluate_over_digits(Sigs,df,clf,verbose = False):
@@ -109,6 +131,7 @@ def evaluate_over_digits(Sigs,df,clf,verbose = False):
     mean_ROC_AUC = 0
     digits_accuracy = []
     digits_ROC_AUC = []
+    digits_correct_pred = []
     for digit in range(10):
 
         X_train = Sigs[(df['Digit'] == digit) & (df['Subset'] == 'train'),:]
@@ -134,7 +157,7 @@ def evaluate_over_digits(Sigs,df,clf,verbose = False):
         ## roc auc score
         ROC_AUC = sklearn.metrics.roc_auc_score(true,clf.decision_function(X_test))
         digits_ROC_AUC.append(ROC_AUC)
-        
+        digits_correct_pred.append(pred == true)
         if verbose:
             print('ROC AUC for digit ',digit,': ', ROC_AUC,'\n')
         mean_ROC_AUC += ROC_AUC/10
@@ -143,7 +166,7 @@ def evaluate_over_digits(Sigs,df,clf,verbose = False):
         print('Mean accuracy: ',mean_accuracy)
         print('Mean ROC AUC: ', mean_ROC_AUC)
     
-    return mean_accuracy, mean_ROC_AUC, digits_accuracy, digits_ROC_AUC
+    return mean_accuracy, mean_ROC_AUC, digits_accuracy, digits_ROC_AUC, digits_correct_pred
 
 def ecdf(x):
 #compute the empirical cumulative distribution function for the values in x.
@@ -189,5 +212,96 @@ def plot_score(paths,df,clf,hparams, save = False):
         clf[1],hparams['res_size']))
     if save:
         plt.savefig('empirical_cdf_res_size_{}.pdf'.format(hparams['res_size']))
-    plt.show()    
- 
+    plt.show()
+    
+def train_SKAB(clf,list_of_df,len_sub,d,hyperparams_dict,plot = False):
+# return the array needed to evaluate the model using the from tsad.evaluating.evaluating import evaluating
+# evaluating function.
+# 
+# Input:
+# len_sub: the original (long) sequence of each dataset is splitted into shorter
+#          subsequences of length len_sub.
+# hparams: the dictionary containing the parameter used for generating the r-Sig
+# list_of_df: list containg the pd df for each dataset that we want to test
+# plot: if true visualize the predictions and the ground truth
+# d: dimension of the paths that we consider
+# Output:
+# anomalies: pd serie indexed by time stamp, the value of each entry is 0 if 
+#            the observation is normal and 1 if the observation is anomalous
+# changepoints: pd serie indexed by time stamp, the value of each entry is 0 if 
+#               the observation is normal and 1 if the observation is a changepoint
+# 
+# predictions: pd serie indexed by time stamp, the value of each entry is 0 if 
+# the model predict that the observation is normal and 1 if the model predict the 
+# observation to be anomalous 
+    [As,bs] = get_random_coeff(8,hyperparams_dict)
+
+    anomalies = []
+    changepoints = []
+    time_list = []
+    predictions = []
+
+    for df_test in tqdm(list_of_df):
+        
+        #save values for anomaly and changepoints
+        anomalies_temp = df_test['anomaly'].to_list()[400:]
+        changepoints_temp = df_test['changepoint'].to_list()[400:]
+        df_test = df_test.drop(columns = ['anomaly','changepoint'])
+        anomalies = anomalies + anomalies_temp
+        changepoints = changepoints + changepoints_temp
+        
+        #save values as pd timestamp 
+        time_list_temp = df_test['datetime'].to_list()[400:]
+        time_list_temp = [pd.Timestamp(t) for t in time_list_temp]
+        df_test = df_test.drop(columns = ['datetime'])
+        time_list = time_list + time_list_temp
+        
+        
+        # final paths
+        paths = df_test.to_numpy()
+        
+        #split in train and test
+        paths_train = paths[:400,:]
+        paths_test = paths[400:,:]
+        
+        paths_train = [paths_train[len_sub*i:len_sub*(i+1),:] for i in range(int(paths_train.shape[0]/len_sub+1))]
+        
+        #if the time series is an exact multiple of len_sub then the last element in paths_train is [] 
+        if len(paths_train[-1])==0:
+            paths_train.pop()
+        paths_train = [sklearn.preprocessing.MinMaxScaler().fit_transform(path) for path in paths_train]
+        
+        paths_test = [paths_test[len_sub*i:len_sub*(i+1),:] for i in range(int(paths_test.shape[0]/len_sub+1))]
+        if len(paths_test[-1])==0:
+            paths_test.pop()    
+        paths_test = [sklearn.preprocessing.MinMaxScaler().fit_transform(path) for path in paths_test]
+        
+        Sigs_train = np.array([compute_signature(As,bs,paths_train[i],False,hyperparams_dict) 
+                         for i in range(len(paths_train))])
+        
+        Sigs_test = np.array([compute_signature(As,bs,paths_test[i],False,hyperparams_dict) 
+                         for i in range(len(paths_test))])
+        
+        ## fit the model
+        clf.fit(Sigs_train)
+        
+        # store results as pd series
+        pred_anomalies = []
+        for i in range(len(paths_test)):
+            pred_anomalies = pred_anomalies + (-0.5*(clf.predict(Sigs_test)[i]-np.ones(paths_test[i].shape[0]))).tolist()
+        predictions = predictions + pred_anomalies
+        
+        ## Plot the results for each dataset
+        if plot:
+            plt.plot(pred_anomalies,marker = 'o',label = 'predictions')
+            plt.plot(anomalies_temp,label = 'anomalies')
+            plt.plot(changepoints_temp,label = 'changepoints')
+            plt.legend()
+            plt.title('Result')
+            plt.figure()
+
+    anomalies = pd.Series(data = anomalies, index = time_list)
+    changepoints = pd.Series(data = changepoints, index = time_list)
+    predictions = pd.Series(data = predictions, index =  time_list)
+
+    return anomalies, changepoints, predictions
