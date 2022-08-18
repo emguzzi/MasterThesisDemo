@@ -77,6 +77,10 @@ def compute_signature(As,bs,path,trajectory = False,hparams = hyperparams_dict):
     return Sig
 
 def compute_signature_vect(As,bs,paths,hparams = hyperparams_dict):
+## same as compute_signature. Only difference being the use of the einsum function. Can be used only if all the
+## paths have the same length and in that case it is faster than compute_signature. The other hyperparamers are as
+## in compute_signature. 
+
     dX = np.diff(paths, axis = 1)
     Sig = np.ones((paths.shape[0],As.shape[1]))
     for i in tqdm(range(dX.shape[1])):
@@ -86,6 +90,8 @@ def compute_signature_vect(As,bs,paths,hparams = hyperparams_dict):
         Sig += np.einsum('bij,bi -> bj',temp,dX[:,i,:],optimize = True)
     
     return Sig    
+
+
 def get_signature(paths,trajectory = False,vect = False,**kwargs):
 #Return the Signature for all the path in paths.
 #paths: batch of paths for which we want to compute the Signature.
@@ -208,7 +214,7 @@ def plot_score(paths,df,clf,hparams, save = False):
     plt.ylabel('Cumulative probability')
     plt.legend(loc='lower right')
     plt.grid()
-    plt.title('Empirical cumulative distribution of the Isolation Score \n (Method: {}, Reservoir dimension: N = {})'.format(
+    plt.title('Empirical cumulative distribution of the Isolation Score \n (Method: {}, Reservoir dimension: k = {})'.format(
         clf[1],hparams['res_size']))
     if save:
         plt.savefig('empirical_cdf_res_size_{}.pdf'.format(hparams['res_size']))
