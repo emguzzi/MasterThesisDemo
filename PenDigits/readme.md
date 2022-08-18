@@ -9,8 +9,8 @@ of the thesis as well as to obtain Figure 4.
 Contains the code needed to explore the dependency of the model on the hyperparameters and to recreate the heatmaps in Figure 5 of the thesis.
 
 ### RandomSignature
-Contains the functions needed to evaluate the model on the PenDigits dataset and to compute the randomized signature. Also in [SKAB](https://github.com/emguzzi/MasterThesisDemo/tree/main/SKAB) and 
+Contains the functions needed to compute the randomized signature. Also in [SKAB](https://github.com/emguzzi/MasterThesisDemo/tree/main/SKAB) and 
 [SpeechCommands](https://github.com/emguzzi/MasterThesisDemo/tree/main/SpeechCommands) the computations of the randomized signature will rely on these funcitons.
 
 ### util
-Contains the function to load the dataset taken from the following [repository](https://github.com/pafoster/conformance_distance_experiments_cochrane_et_al_2020).
+Contains the function to load the dataset and the functions used to evaluate the model in the PenDigitDemo notebook. 
