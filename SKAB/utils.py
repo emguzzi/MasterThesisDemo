@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import sys
-sys.path.append('../PenDigitsRanSig/')
+sys.path.append('../PenDigits/')
 import sklearn
 from RandomSignature import *
 import numpy as np
@@ -48,7 +48,7 @@ def evaluate(hyperparams_dict,len_sub,clf,cont):
 
     ## test the model 
     ## read the data
-    list_of_df = util.read_SKAB(anomaly_free = False)
+    list_of_df = read_SKAB(anomaly_free = False)
 
 
     anomalies = []
