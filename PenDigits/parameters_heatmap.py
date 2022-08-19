@@ -7,9 +7,11 @@ import numpy as np
 import sklearn.preprocessing
 from RandomSignature import *
 import seaborn as sns
+from sklearn.ensemble import IsolationForest
+from sklearn.svm import OneClassSVM
 
-data = {'train': util.load_pendigits_dataset('Data/pendigits-orig.tra'),
-        'test': util.load_pendigits_dataset('Data/pendigits-orig.tes')}
+data = {'train': util.load_pendigits_dataset('../Data/PenDigits_Data/pendigits-orig.tra'),
+        'test': util.load_pendigits_dataset('../Data/PenDigits_Data/pendigits-orig.tes')}
 
 dataframes = []
 for subset, data in data.items():
@@ -68,7 +70,7 @@ for i,r in enumerate(res_sizes):
         # compute the randomized Signature
         Sigs = get_signature(paths,hparams = hyperparams_dict)
 
-        mean_acc,mean_roc,_,_,_ = evaluate_over_digits(Sigs,df,clf[0])
+        mean_acc,mean_roc,_,_,_ = util.evaluate_over_digits(Sigs,df,clf[0])
         heatmap_roc[i,j] = mean_roc
         heatmap_acc[i,j] = mean_acc
 

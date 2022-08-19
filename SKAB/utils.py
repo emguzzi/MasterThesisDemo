@@ -15,7 +15,7 @@ def read_SKAB(anomaly_free = False):
 # converted to numpy and returned separately
   
     all_files=[]
-    for root, dirs, files in os.walk("../Data/SKAB_data/"):
+    for root, dirs, files in os.walk("../Data/SKAB_Data/"):
         for file in files:
             if file.endswith(".csv"):
                  all_files.append(os.path.join(root, file))
@@ -24,7 +24,7 @@ def read_SKAB(anomaly_free = False):
                               sep=';', 
                               parse_dates=True) for file in all_files if 'anomaly-free' not in file]
     if anomaly_free:
-        path_anomaly_free = '../Data/SKAB_data/anomaly-free/anomaly-free.csv'
+        path_anomaly_free = '../Data/SKAB_Data/anomaly-free/anomaly-free.csv'
         df_anomaly_free = pd.read_csv(path_anomaly_free,sep = ';')
         df_anomaly_free = df_anomaly_free.drop(columns = ['datetime'])
         paths_anomaly_free = df_anomaly_free.to_numpy()
