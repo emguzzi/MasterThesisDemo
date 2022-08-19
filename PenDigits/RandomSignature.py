@@ -74,6 +74,7 @@ def compute_signature_vect(As,bs,paths,hparams = hyperparams_dict):
 ## same as compute_signature. Only difference being the use of the einsum function. Can be used only if all the
 ## paths have the same length and in that case it is faster than compute_signature. The other hyperparamers are as
 ## in compute_signature. 
+## paths need to be an array of shape (batch_dim,len,channels)
 
     dX = np.diff(paths, axis = 1)
     Sig = np.ones((paths.shape[0],As.shape[1]))
