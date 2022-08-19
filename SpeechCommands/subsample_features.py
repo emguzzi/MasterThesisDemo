@@ -6,13 +6,13 @@ from sklearn.ensemble import RandomForestClassifier
 import pickle
 import numpy as np
 
-with open('./paths_time.pkl','rb') as f:
+with open('../Data/SpeechCommands_Data/paths_time.pkl','rb') as f:
     paths = pickle.load(f)
-with open('./drive/y_train.pkl','rb') as f:
+with open('../Data/SpeechCommands_Data/y_train.pkl','rb') as f:
     y_train = pickle.load(f)
-with open('./drive/y_test.pkl','rb') as f:
+with open('../Data/SpeechCommands_Data/y_test.pkl','rb') as f:
     y_test = pickle.load(f)
-with open('./drive/y_validation.pkl','rb') as f:
+with open('../Data/SpeechCommands_Data/y_validation.pkl','rb') as f:
     y_validation = pickle.load(f)
     
 paths_np = np.array(paths)

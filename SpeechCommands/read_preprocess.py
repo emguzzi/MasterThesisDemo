@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 import sklearn.preprocessing
 
-data_path = './'
+data_path = '../Data/SpeechCommands_Data/'
 
 X = torch.empty(34975,16000,1)
 x_ind = 0
